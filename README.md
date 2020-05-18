@@ -1,7 +1,9 @@
 # Dependencies - An open-source modern Dependency Walker
 [![Build status](https://ci.appveyor.com/api/projects/status/wtr5v8ksndbkkqxg?svg=true)](https://ci.appveyor.com/project/lucasg/dependencies)
 
-### [Download here](https://github.com/lucasg/Dependencies/releases/download/v1.9/Dependencies_x64_Release.zip)
+### [Download here](https://github.com/lucasg/Dependencies/releases/download/v1.10/Dependencies_x64_Release.zip)
+
+#### [(If you're running an AV, use this download instead)](https://github.com/lucasg/Dependencies/releases/download/v1.10/Dependencies_x64_Release_.without.peview.exe.zip)
 
 NB : due to [limitations on /clr compilation](https://msdn.microsoft.com/en-us/library/ffkc918h.aspx), `Dependencies` needs [Visual C++  Redistributable](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads) installed to run properly.
 
@@ -15,6 +17,9 @@ NB : due to [limitations on /clr compilation](https://msdn.microsoft.com/en-us/l
 `Dependencies` can help Windows developers troubleshooting their dll load dependencies issues.
 
 ## Releases
+* [v1.10](https://github.com/lucasg/Dependencies/releases/download/v1.10/Dependencies_x64_Release.zip) :
+	* lots of bugfixes and incremental improvements
+	* support of Windows 8.1 apisets parsing
 * [v1.9](https://github.com/lucasg/Dependencies/releases/download/v1.9/Dependencies_x64_Release.zip) :
 	* Display imports and exports the way Depends.exe does.
 	* Added user customization for search folders and working directory
@@ -41,8 +46,6 @@ NB : due to [limitations on /clr compilation](https://msdn.microsoft.com/en-us/l
 `Dependencies` is currently shipped as a binary (no installer present). Just click on one of the release numbers above (probably the latest), download and uncompress the archive and run DependenciesGui.exe.
 Since the binary is not signed, `SmartScreen` might scream at runtime. `Dependencies` also bundle `ClrPhTester.exe`, a dumpbin-like executable used to test for non-regressions.
 
-Since `v1.6`, Dependencies is also packaged as an appx package (the Windows equivalent of a `.deb` file) which can be installed locally. However, you also need to add the test certificate `DependenciesAppx_TemporaryKey.cer` to your cert hive.
-
 `Dependencies` currently does not recursively resolve child imports when parsing a new PE since it can be really memory-hungry to do so ( it can over a GB even for "simple" PEs ). This behavior can be overridden (app-wide) via a property located in "Options->Properties->Tree build behaviour".
 
 <p align="center">
@@ -68,6 +71,12 @@ At the moment, `Dependencies` recreates features and "features" of `depends.exe`
 * Support of api set schema redirection since 1.5
 * Checks between Api Imports and Exports. 
 * Minimal support of sxs private manifests search only.
+
+
+## Building
+
+Building is pretty straightforward.
+The only caveat is you need to select the "Debug" or "Release" configuration and "x64" or "x86" platform which may not be the default.
 
 
 ## Credits and licensing

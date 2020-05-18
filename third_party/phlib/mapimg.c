@@ -656,13 +656,24 @@ NTSTATUS PhGetMappedImageExports(
         exportDirectory->AddressOfNameOrdinals,
         NULL
         );
+	
+	// Exports exist but no AddressTable => ERROR
+	if (!Exports->AddressTable)
+	{
+		return STATUS_INVALID_PARAMETER;
+	}
 
-    if (
-        !Exports->AddressTable ||
-        !Exports->NamePointerTable ||
-        !Exports->OrdinalTable
-        )
-        return STATUS_INVALID_PARAMETER;
+	// Exports by name exist but no NamePointerTable => ERROR
+    if ( exportDirectory->NumberOfNames && !Exports->NamePointerTable )
+	{
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	// Exports by ordinal exist but no OrdinalTable => ERROR
+	if ( exportDirectory->NumberOfNames && !Exports->OrdinalTable)
+	{
+		return STATUS_INVALID_PARAMETER;
+	}
 
     __try
     {
@@ -772,6 +783,11 @@ NTSTATUS PhGetMappedImageExportFunction(
         return STATUS_PROCEDURE_NOT_FOUND;
 
     rva = Exports->AddressTable[Ordinal];
+	// A non-exported by name ordinal export cannot apparently have a NULL rva
+	if (!Name && !rva)
+	{
+		return STATUS_PROCEDURE_NOT_FOUND;
+	}
 
     if (
         (rva >= Exports->DataDirectory->VirtualAddress) &&

@@ -103,8 +103,6 @@ bool PE::InitProperties()
 	return true;
 }
 
-
-
 Collections::Generic::List<PeExport^> ^ PE::GetExports()
 {
     if (m_ExportsInit)
@@ -120,7 +118,13 @@ Collections::Generic::List<PeExport^> ^ PE::GetExports()
     {
         for (size_t Index = 0; Index < m_Impl->m_PvExports.NumberOfEntries; Index++)
         {
-            m_Exports->Add(gcnew PeExport(*m_Impl, Index));
+			PeExport^ exp = PeExport::FromMapimg(*m_Impl, Index);
+
+			if (exp)
+			{
+				m_Exports->Add(exp);
+			}
+
         }
     }
 

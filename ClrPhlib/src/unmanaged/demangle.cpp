@@ -213,6 +213,7 @@ bool UndecorateSymbolDemangleName(
 )
 {
 	PPH_STRING PhUndecoratedName = NULL;
+	wchar_t* Undname = NULL;
 
 	if ((!UndecoratedName) || (!UndecoratedNameLen)) {
 		return false;
@@ -223,17 +224,29 @@ bool UndecorateSymbolDemangleName(
 		DecoratedName
 	);
 
-	if ((!PhUndecoratedName) || !wcsncmp(PhUndecoratedName->Buffer, DecoratedName, PhUndecoratedName->Length))
+	if (!PhUndecoratedName)
+	{
+		return false;
+	}
+
+	if (!wcsncmp(PhUndecoratedName->Buffer, DecoratedName, PhUndecoratedName->Length))
 	{
 		PhDereferenceObject(PhUndecoratedName);
 		return false;
 	}
 
-	*UndecoratedNameLen = PhUndecoratedName->Length;
-	*UndecoratedName = (wchar_t*)malloc(PhUndecoratedName->Length + sizeof(wchar_t));
+	
+	Undname = (wchar_t*)calloc(PhUndecoratedName->Length + sizeof(wchar_t), 1);
+	if (!Undname)
+	{
+		PhDereferenceObject(PhUndecoratedName);
+		return false;
+	}
 
-	memset(*UndecoratedName, 0, PhUndecoratedName->Length + sizeof(wchar_t));
-	memcpy(*UndecoratedName, PhUndecoratedName->Buffer, PhUndecoratedName->Length);
+	memcpy(Undname, PhUndecoratedName->Buffer, PhUndecoratedName->Length);
+
+	*UndecoratedNameLen = PhUndecoratedName->Length;
+	*UndecoratedName = Undname;
 
 	PhDereferenceObject(PhUndecoratedName);
 	return true;

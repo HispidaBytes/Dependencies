@@ -66,11 +66,16 @@ namespace Dependencies
             Schema = Phlib.GetApiSetSchema();
         }
 
+        public NtApiSet(PE ApiSetSchemaDll)
+        {
+          Schema = ApiSetSchemaDll.GetApiSetSchema();
+        }
+
         public void PrettyPrint()
         {
             Console.WriteLine("[-] Api Sets Map : ");
 
-            foreach (var ApiSetEntry in this.Schema)
+            foreach (var ApiSetEntry in this.Schema.GetAll())
             {
                 ApiSetTarget ApiSetImpl = ApiSetEntry.Value;
                 string ApiSetName = ApiSetEntry.Key;
@@ -246,97 +251,121 @@ namespace Dependencies
     }
 
 
+    // Basic custom exception used to be able to differentiate between a "native" exception
+    // and one that has been already catched, processed and rethrown
+    public class RethrownException : Exception
+    {
+        public RethrownException(Exception e)
+        :base(e.Message, e.InnerException)
+        {
+        }
+
+    }
+
 
     class PeDependencyItem : IPrettyPrintable
     {
 
         public PeDependencyItem(PeDependencies _Root, string _ModuleName,  string ModuleFilepath, ModuleSearchStrategy Strategy, int Level)
         {
-            Root = _Root;
-            ModuleName = _ModuleName;
+            Action action = () =>
+            {
+                Root = _Root;
+                ModuleName = _ModuleName;
 
 
-			Imports = new List<PeImportDll>();
-			Filepath = ModuleFilepath;
-            SearchStrategy = Strategy;
-            RecursionLevel = Level;
+    			Imports = new List<PeImportDll>();
+    			Filepath = ModuleFilepath;
+                SearchStrategy = Strategy;
+                RecursionLevel = Level;
 
-            DependenciesResolved = false;
-			Dependencies = new List<PeDependencyItem>();
-			ResolvedImports = new List<PeDependencyItem>();
+                DependenciesResolved = false;
+    			Dependencies = new List<PeDependencyItem>();
+    			ResolvedImports = new List<PeDependencyItem>();
+            };
+
+            SafeExecutor(action);
 		}
 
 		public void LoadPe()
 		{
-			if (Filepath != null)
-			{
-				PE Module = BinaryCache.LoadPe(Filepath);
-				Imports = Module.GetImports();
-			}
-			else
-			{
-				//Module = null;
+            Action action = () =>
+            {
+    			if (Filepath != null)
+    			{
+    				PE Module = BinaryCache.LoadPe(Filepath);
+    				Imports = Module.GetImports();
+    			}
+    			else
+    			{
+    				//Module = null;
+    			}
+            };
 
-			}
+            SafeExecutor(action);
 		}
 
 		public void ResolveDependencies()
         {
-
-			if (DependenciesResolved)
+            Action action = () =>
             {
-                return;
-            }
-
-
-			foreach (PeImportDll DllImport in Imports)
-            {
-                string ModuleFilepath = null;
-                ModuleSearchStrategy Strategy;
-                
-
-                // Find Dll in "paths"
-                Tuple<ModuleSearchStrategy, PE> ResolvedModule =  Root.ResolveModule(DllImport.Name);
-                Strategy = ResolvedModule.Item1;
-
-                if (Strategy != ModuleSearchStrategy.NOT_FOUND)
+    			if (DependenciesResolved)
                 {
-                    ModuleFilepath = ResolvedModule.Item2?.Filepath;
+                    return;
                 }
 
 
-                
-				bool IsAlreadyCached = Root.isModuleCached(DllImport.Name, ModuleFilepath);
-				PeDependencyItem DependencyItem = Root.GetModuleItem(DllImport.Name, ModuleFilepath, Strategy, RecursionLevel + 1);
-				
-				// do not add twice the same imported module
-				if (ResolvedImports.Find(ri => ri.ModuleName == DllImport.Name) == null)
-				{
-					ResolvedImports.Add(DependencyItem);
-				}
-				
-				// Do not process twice a dependency. It will be displayed only once
-				if (!IsAlreadyCached)
-				{
-					Debug.WriteLine("[{0:d}] [{1:s}] Adding dep {2:s}", RecursionLevel, ModuleName, ModuleFilepath);
-					Dependencies.Add(DependencyItem);
-				}
+    			foreach (PeImportDll DllImport in Imports)
+                {
+                    string ModuleFilepath = null;
+                    ModuleSearchStrategy Strategy;
+                    
 
-			}
+                    // Find Dll in "paths"
+                    Tuple<ModuleSearchStrategy, PE> ResolvedModule =  Root.ResolveModule(DllImport.Name);
+                    Strategy = ResolvedModule.Item1;
 
-            DependenciesResolved = true;
-			if ((Root.MaxRecursion > 0) && ((RecursionLevel + 1) >= Root.MaxRecursion))
-			{
-				return;
-			}
+                    if (Strategy != ModuleSearchStrategy.NOT_FOUND)
+                    {
+                        ModuleFilepath = ResolvedModule.Item2?.Filepath;
+                    }
 
 
-			// Recursively resolve dependencies
-			foreach (var Dep in Dependencies)
-            {
-				Dep.LoadPe();
-				Dep.ResolveDependencies();
-            }
+                    
+    				bool IsAlreadyCached = Root.isModuleCached(DllImport.Name, ModuleFilepath);
+    				PeDependencyItem DependencyItem = Root.GetModuleItem(DllImport.Name, ModuleFilepath, Strategy, RecursionLevel + 1);
+    				
+    				// do not add twice the same imported module
+    				if (ResolvedImports.Find(ri => ri.ModuleName == DllImport.Name) == null)
+    				{
+    					ResolvedImports.Add(DependencyItem);
+    				}
+    				
+    				// Do not process twice a dependency. It will be displayed only once
+    				if (!IsAlreadyCached)
+    				{
+    					Debug.WriteLine("[{0:d}] [{1:s}] Adding dep {2:s}", RecursionLevel, ModuleName, ModuleFilepath);
+    					Dependencies.Add(DependencyItem);
+    				}
+
+    			}
+
+                DependenciesResolved = true;
+    			if ((Root.MaxRecursion > 0) && ((RecursionLevel + 1) >= Root.MaxRecursion))
+    			{
+    				return;
+    			}
+
+
+    			// Recursively resolve dependencies
+    			foreach (var Dep in Dependencies)
+                {
+    				Dep.LoadPe();
+    				Dep.ResolveDependencies();
+                }
+            };
+
+            SafeExecutor(action);
         }
 
         public void PrettyPrint()
@@ -366,15 +395,45 @@ namespace Dependencies
 			Console.WriteLine("{0:s}├ {1:s} ({2:s}) : {3:s} ", Tabs, ModuleName, SearchStrategy.ToString(), Filepath);
 		}
 
+        private void SafeExecutor(Action action)
+        {
+            SafeExecutor(() => { action(); return 0; });
+        }
+
+        private T SafeExecutor<T>(Func<T> action)
+        {
+            try
+            {
+                return action();
+            }
+            catch (RethrownException rex)
+            {
+                Console.Error.WriteLine(" - \"{0:s}\"", Filepath);
+                throw rex;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("[!] Unhandled exception occured while processing \"{1:s}\"", RecursionLevel, Filepath);
+                Console.Error.WriteLine("Stacktrace:\n{0:s}\n", ex.StackTrace);
+                Console.Error.WriteLine("Modules backtrace:");
+                throw new RethrownException(ex);
+            }
+            finally
+            {
+                //
+                
+            }
+
+            return default(T);
+        }
+
 		public string ModuleName;
         public string Filepath;
         public ModuleSearchStrategy SearchStrategy;
         public List<PeDependencyItem> Dependencies;
+
 		protected List<PeDependencyItem> ResolvedImports;
-
 		protected List<PeImportDll> Imports;
-		
-
 		protected PeDependencies Root;
         protected int RecursionLevel;
 
@@ -508,6 +567,12 @@ namespace Dependencies
             Printer(ApiSet);
         }
 
+        public static void DumpApiSets(PE Application, Action<IPrettyPrintable> Printer, int recursion_depth = 0)
+        {
+          NtApiSet ApiSet = new NtApiSet(Application);
+          Printer(ApiSet);
+        }
+
 		public static void DumpManifest(PE Application, Action<IPrettyPrintable> Printer, int recursion_depth = 0)
         {
             PEManifest Manifest = new PEManifest(Application);
@@ -562,20 +627,21 @@ namespace Dependencies
             string Usage = String.Join(Environment.NewLine,
                 "Dependencies.exe : command line tool for dumping dependencies and various utilities.",
                 "",
-                "Usage : Dependencies.exe [OPTIONS] FILE",
+                "Usage : Dependencies.exe [OPTIONS] <FILE>",
                 "",
                 "Options :",
                 "  -h -help : display this help",
                 "  -json : activate json output.",
                 "  -apisets : dump the system's ApiSet schema (api set dll -> host dll)",
+                "  -apisetsdll : dump the ApiSet schema from apisetschema <FILE> (api set dll -> host dll)",
                 "  -knowndll : dump all the system's known dlls (x86 and x64)",
-                "  -manifest : dump FILE embedded manifest, if it exists.",
-                "  -sxsentries : dump all of FILE's sxs dependencies.",
-                "  -imports : dump FILE imports",
-                "  -exports : dump  FILE exports",
-                "  -modules : dump FILE resolved modules",
-                "  -chain : dump FILE whole dependency chain"
-                
+                "  -manifest : dump <FILE> embedded manifest, if it exists.",
+                "  -sxsentries : dump all of <FILE>'s sxs dependencies.",
+                "  -imports : dump <FILE> imports",
+                "  -exports : dump <FILE> exports",
+                "  -modules : dump <FILE> resolved modules",
+                "  -chain : dump <FILE> whole dependency chain"
+
             );
 
             Console.WriteLine(Usage);
@@ -609,15 +675,19 @@ namespace Dependencies
 							{ "d|depth=",  "limit recursion depth when analyisng loaded modules or dependency chain. Default value is infinite", (int v) =>  recursion_depth = v },
 							{ "knowndll", "List all known dlls", v => { DumpKnownDlls(GetObjectPrinter(export_as_json));  early_exit = true; } },
 							{ "apisets", "List apisets redirections", v => { DumpApiSets(GetObjectPrinter(export_as_json));  early_exit = true; } },
-                            { "manifest", "show manifest information embedded in PE file", v => command = DumpManifest },
-                            { "sxsentries", "dump all of FILE's sxs dependencies", v => command = DumpSxsEntries },
-                            { "imports", "dump FILE imports", v => command = DumpImports },
-                            { "exports", "dump  FILE exports", v => command = DumpExports },
-                            { "chain", "dump FILE whole dependency chain", v => command = DumpDependencyChain },
-                            { "modules", "dump FILE resolved modules", v => command = DumpModules },
+                            { "apisetsdll", "List apisets redirections from apisetschema <FILE>", v => command = DumpApiSets },
+                            { "manifest", "show manifest information embedded in <FILE>", v => command = DumpManifest },
+                            { "sxsentries", "dump all of <FILE>'s sxs dependencies", v => command = DumpSxsEntries },
+                            { "imports", "dump <FILE> imports", v => command = DumpImports },
+                            { "exports", "dump <FILE> exports", v => command = DumpExports },
+                            { "chain", "dump <FILE> whole dependency chain", v => command = DumpDependencyChain },
+                            { "modules", "dump <FILE> resolved modules", v => command = DumpModules },
 						};
 
 			List<string> eps = opts.Parse(args);
+
+			if (early_exit)
+				return;
 
 			if ((show_help) || (args.Length == 0) || (command == null))
 			{
@@ -625,11 +695,23 @@ namespace Dependencies
 				return;
 			}
 
-			if (early_exit)
-				return;
+            if (eps.Count == 0)
+            {
+                Console.Error.WriteLine("[x] Command {0:s} needs to have a PE <FILE> argument", command.Method.Name);
+                Console.Error.WriteLine("");
+
+                DumpUsage();
+                return;
+            }
 
 			String FileName = eps[0];
-			//Console.WriteLine("[-] Loading file {0:s} ", FileName);
+            if (!NativeFile.Exists(FileName))
+            {
+                Console.Error.WriteLine("[x] Could not find file {0:s} on disk", FileName);
+                return;
+            }
+
+			Debug.WriteLine("[-] Loading file {0:s} ", FileName);
 			PE Pe = new PE(FileName);
             if (!Pe.Load())
             {

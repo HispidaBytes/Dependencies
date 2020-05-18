@@ -88,8 +88,18 @@ public class DisplayPeImport : SettingBindingHandler
         }
     }
 
-    public int Hint { get { return Info.hint; } }
-    public int? Ordinal { get { if (Info.importByOrdinal) { return Info.ordinal; } return null; } }
+    public ushort? Hint
+    {
+        get
+        {
+            if (Info.importByOrdinal)
+                return null;
+
+            return Info.hint;
+        }
+    }
+
+    public ushort? Ordinal { get { if (Info.importByOrdinal) { return Info.ordinal; } return null; } }
 
     public string Name
     {
@@ -174,7 +184,13 @@ public class DisplayPeImport : SettingBindingHandler
                     }
 
                     Clipboard.Clear();
-                    Clipboard.SetText((string)param, TextDataFormat.Text);
+
+                    try
+                    {
+
+                        Clipboard.SetText((string)param, TextDataFormat.Text);
+                    }
+                    catch { }
                 });
             }
 
@@ -191,8 +207,8 @@ public class DisplayPeImport : SettingBindingHandler
 
 public struct PeImportInfo
 {
-   public int ordinal;
-   public int hint;
+   public ushort ordinal;
+   public ushort hint;
 
    public string name;
    public string moduleName;

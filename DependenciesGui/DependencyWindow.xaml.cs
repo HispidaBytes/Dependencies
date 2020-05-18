@@ -185,7 +185,7 @@ namespace Dependencies
             }
         }
 
-		public ModuleTreeViewItem ParentModule
+        public ModuleTreeViewItem ParentModule
 		{
 			get
 			{
@@ -213,7 +213,11 @@ namespace Dependencies
 
 				VerifyModuleImports();
 				_importsVerified = true;
-				return ModuleInfo.HasErrors;
+
+                // Update tooltip only once some basic checks are done
+                this.ToolTip = ModuleInfo.Status;
+
+                return ModuleInfo.HasErrors;
 			}
 		}
 
@@ -303,7 +307,7 @@ namespace Dependencies
                 return false;
             }
 
-            PeviewerProcess.StartInfo.FileName = programPath;
+            PeviewerProcess.StartInfo.FileName = String.Format("\"{0:s}\"", programPath);
             PeviewerProcess.StartInfo.Arguments = Filepath;
             return PeviewerProcess.Start();
         }
@@ -324,7 +328,7 @@ namespace Dependencies
 
                         Process OtherDependenciesProcess = new Process();
                         OtherDependenciesProcess.StartInfo.FileName = System.Windows.Forms.Application.ExecutablePath;
-                        OtherDependenciesProcess.StartInfo.Arguments = Filepath;
+                        OtherDependenciesProcess.StartInfo.Arguments = String.Format("\"{0:s}\"", Filepath);
                         OtherDependenciesProcess.Start();
                     });
                 }
@@ -384,8 +388,18 @@ namespace Dependencies
 
         public void InitializeView()
         {
-            this.Pe = (Application.Current as App).LoadBinary(this.Filename);
+            if (!NativeFile.Exists(this.Filename))
+            {
+                MessageBox.Show(
+                    String.Format("{0:s} is not present on the disk", this.Filename),
+                    "Invalid PE",
+                    MessageBoxButton.OK
+                );
 
+                return;
+            }
+
+            this.Pe = (Application.Current as App).LoadBinary(this.Filename);
 			if (this.Pe == null || !this.Pe.LoadSuccessful)
 			{
                 MessageBox.Show(
@@ -940,31 +954,42 @@ namespace Dependencies
 			
 			DependencyNodeContext childTreeContext = ((DependencyNodeContext)(this.DllTreeView.SelectedItem as ModuleTreeViewItem).DataContext);
             DisplayModuleInfo SelectedModule = childTreeContext.ModuleInfo.Target as DisplayModuleInfo;
-
-			// Selected Pe has not been found on disk
-			if (SelectedModule == null)
+            if (SelectedModule == null)
+            {
                 return;
+            }
 
-			// Root Item : no parent
-			ModuleTreeViewItem TreeRootItem = this.DllTreeView.Items[0] as ModuleTreeViewItem;
+            // Selected Pe has not been found on disk : unvalidate current module
+            SelectedModule.HasErrors = !NativeFile.Exists(SelectedModule.Filepath);
+            if (SelectedModule.HasErrors)
+            {
+                // TODO : do a proper refresh instead of asking the user to do it
+                System.Windows.MessageBox.Show(String.Format("We could not find {0:s} file on the disk anymore, please fix this problem and refresh the window via F5", SelectedModule.Filepath));
+            }
+
+            // Root Item : no parent
+            ModuleTreeViewItem TreeRootItem = this.DllTreeView.Items[0] as ModuleTreeViewItem;
 			ModuleTreeViewItem SelectedItem = this.DllTreeView.SelectedItem as ModuleTreeViewItem;
 			if (SelectedItem == TreeRootItem)
 			{
-				UpdateImportExportLists(SelectedModule, null);
+                // Selected Pe has not been found on disk : unvalidate current module
+                if (SelectedModule.HasErrors)
+                {
+                    UpdateImportExportLists(null, null);
+                }
+                else
+                {
+                    SelectedModule.HasErrors = false;
+                    UpdateImportExportLists(SelectedModule, null);
+                }
+    
 				return;
 			}
 
-			// find parent. TODO : add parent ref to treeview context
-			//var parent = VisualTreeHelper.GetParent(SelectedItem as DependencyObject);
-			//while ((parent as TreeViewItem) == null)
-			//{
-			//	parent = VisualTreeHelper.GetParent(parent);
-			//}
-
-			//DependencyNodeContext parentTreeContext = ((DependencyNodeContext)(SelectedItem.ParentModule).DataContext);
-			DisplayModuleInfo parentModule = SelectedItem.ParentModule.ModuleInfo;// parentTreeContext.ModuleInfo.Target as DisplayModuleInfo;
-
-			UpdateImportExportLists(SelectedModule, parentModule);
+			// Tree Item
+			DisplayModuleInfo parentModule = SelectedItem.ParentModule.ModuleInfo;
+            UpdateImportExportLists(SelectedModule, parentModule);
+            
         }
 
         private void UpdateImportExportLists(DisplayModuleInfo SelectedModule, DisplayModuleInfo Parent)

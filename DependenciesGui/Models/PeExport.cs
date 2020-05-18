@@ -14,8 +14,8 @@ public class DisplayPeExport : SettingBindingHandler
         PhSymbolProvider SymPrv
     )
     {
-        PeInfo.ordinal = PeExport.Ordinal;
-        PeInfo.hint = /*PeExport.Hint*/ PeExport.Ordinal - 1; // @TODO(add hints to exports)
+        PeInfo.ordinal = (ushort) PeExport.Ordinal;
+        PeInfo.hint = (ushort) (/*PeExport.Hint*/ PeExport.Ordinal - 1); // @TODO(add hints to exports)
         PeInfo.name = PeExport.Name;
         PeInfo.ForwardName = PeExport.ForwardedName;
         PeInfo.exportByOrdinal = PeExport.ExportByOrdinal;
@@ -75,8 +75,18 @@ public class DisplayPeExport : SettingBindingHandler
             return 0;
         }
     }
-    public int Hint { get { return PeInfo.hint; } }
-    public int Ordinal { get { return PeInfo.ordinal; } }
+    public ushort ? Hint
+    {
+        get
+        {
+            if (PeInfo.exportByOrdinal)
+                return null;
+
+            return PeInfo.hint;
+        }
+    }
+
+    public ushort Ordinal { get { return PeInfo.ordinal; } }
 
     public string Name
     {
@@ -151,7 +161,13 @@ public class DisplayPeExport : SettingBindingHandler
                     }
 
                     Clipboard.Clear();
-                    Clipboard.SetText((string)param, TextDataFormat.Text);
+
+                    try
+                    {
+                        
+                        Clipboard.SetText((string)param, TextDataFormat.Text);
+                    } catch { }
+
                 });
             }
 
@@ -172,8 +188,8 @@ public struct PeExportInfo
     public Boolean exportByOrdinal;
     public Boolean exportAsCppName;
     public Boolean forwardedExport;
-    public int ordinal;
-    public int hint;
+    public ushort ordinal;
+    public ushort hint;
     public long virtualAddress;
     public string name;
     public string ForwardName;

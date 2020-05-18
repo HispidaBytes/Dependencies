@@ -32,13 +32,15 @@ namespace Dependencies {
 		#pragma endregion ENUMS
 
 		#pragma region TYPES
-        public ref class ApiSetTarget : List<String^>
-        {};
+        public ref class ApiSetTarget : List<String^> {};
 
-        public ref class ApiSetSchema : Dictionary<String^, ApiSetTarget^>
-        {};
+        public ref class ApiSetSchema abstract
+        {
+        public:
+            virtual List<KeyValuePair<String^, ApiSetTarget^>>^ GetAll() = 0;
+            virtual ApiSetTarget^ Lookup(String^ name) = 0;
+        };
 		#pragma endregion TYPES
-
 
         public ref class Phlib {
         public:
@@ -61,21 +63,11 @@ namespace Dependencies {
             // NB: Api set resolution rely on hash buckets who 
             // can contains more entries than this schema.
             static ApiSetSchema^ GetApiSetSchema();
-
-            
-        private:
-            // private implementation of ApiSet schema parsing
-            static ApiSetSchema^ GetApiSetSchemaV2(ULONG_PTR ApiSetMapBaseAddress, PAPI_SET_NAMESPACE_V2 ApiSetMap);
-            static ApiSetSchema^ GetApiSetSchemaV4(ULONG_PTR ApiSetMapBaseAddress, PAPI_SET_NAMESPACE_V4 ApiSetMap);
-            static ApiSetSchema^ GetApiSetSchemaV6(ULONG_PTR ApiSetMapBaseAddress, PAPI_SET_NAMESPACE_V6 ApiSetMap);
-
         };
 
-
-
         public ref struct PeImport {
-            Int16 Hint;
-            Int16 Ordinal;
+            UInt16 Hint;
+            UInt16 Ordinal;
             String ^ Name;
             String ^ ModuleName;
             Boolean ImportByOrdinal;
@@ -112,15 +104,17 @@ namespace Dependencies {
         };
 
         public ref struct PeExport {
-            Int16 Ordinal;
+            UInt16 Ordinal;
             String ^  Name; // may be NULL.
             Boolean ExportByOrdinal;
             Int64   VirtualAddress;
             String ^  ForwardedName;
 
-            PeExport(const UnmanagedPE &refPe, size_t Index);
+			PeExport();
             PeExport(const PeExport ^ other);
             ~PeExport();
+
+			static PeExport^ FromMapimg(const UnmanagedPE& refPe, size_t Index);
 
         };
 
@@ -162,6 +156,9 @@ namespace Dependencies {
 
             // Check if the PE is 32-bit
             bool IsWow64Dll();
+
+            // Return the ApiSetSchema
+            ApiSetSchema^ GetApiSetSchema();
 
             // Return the list of functions exported by the PE
             List<PeExport ^>^ GetExports();
